@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Marks Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #000000, #0f0f0f);
+      color: white;
+    }
+    nav {
+      background: linear-gradient(to right, yellowgreen, lightblue);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+    }
+    nav h1 {
+      color: black;
+    }
+    nav ul {
+      display: flex;
+      list-style: none;
+      gap: 1rem;
+    }
+    nav ul li {
+      background: black;
+      color: #4bff4b;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    nav ul li:hover {
+      background-image: linear-gradient(to right, rgb(255, 183, 0));
+      color: black;
+    }
+    section {
+      display: none;
+      padding: 2rem;
+    }
+    section.active {
+      display: block;
+    }
+    table {
+      width: 100%;
+      margin-top: 1rem;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    th {
+      background: #0ce8dd;
+      color: black;
+    }
+    .button {
+      background: linear-gradient(135deg, #ff069f, #ea00ff);
+      color: black;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background: #9900ff;
+    }
+    .login {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .login-box {
+      background: #23a6e7;
+      padding: 2rem;
+      border-radius: 10px;
+      width: 300px;
+    }
+    .login-box input {
+      width: 100%;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border: 1px solid #4bff4b;
+      background-image: linear-gradient(to right, yellowgreen, lightblue);
+      color: #030303;
+    }
+  </style>
+</head>
+<body>
+  <nav style="display:none">
+    <h1>Student Portal</h1>
+    <ul>
+      <li onclick="switchTab('home')">Home</li>
+      <li onclick="switchTab('marks')">Marks</li>
+      <li onclick="logout()">Logout</li>
+    </ul>
+  </nav>
+
+  <section id="home">
+    <h2>Welcome</h2>
+    <div id="student-info">Loading...</div>
+  </section>
+
+  <section id="marks">
+    <h2>Your Marks</h2>
+    <div id="marks-table">Loading...</div>
+  </section>
+
+  <div id="login" class="login">
+    <div class="login-box">
+      <h2>Login</h2>
+      <input type="email" id="login-email" placeholder="Email">
+      <input type="password" id="login-password" placeholder="Password">
+      <button class="button" onclick="login()">Login</button>
+    </div>
+  </div>
+
+  <script>
+    const supabaseUrl = 'https://rzonfdeltrcxdilqsxuy.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6b25mZGVsdHJjeGRpbHFzeHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3NzEyMTYsImV4cCI6MjA2MjM0NzIxNn0.LgwBTA0x1-gbJkuoziwgh_BYipxxB2IJ8t60MI9LEL4';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    function switchTab(tab) {
+      document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+      document.getElementById(tab).classList.add('active');
+    }
+
+    async function login() {
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        alert("Login failed: " + error.message);
+        return;
+      }
+      document.getElementById('login').style.display = 'none';
+      document.querySelector('nav').style.display = 'flex';
+      loadPortal();
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      location.reload();
+    }
+
+    async function loadPortal() {
+      const { data: sessionData } = await supabase.auth.getUser();
+      const email = sessionData?.user?.email;
+      if (!email) return;
+
+      const { data: student, error: studentError } = await supabase.from('students').select('*').eq('email', email).single();
+      if (studentError || !student) {
+        document.getElementById('student-info').innerHTML = 'Student data not found.';
+        return;
+      }
+      document.getElementById('student-info').innerHTML = `<p>Name: ${student.name}</p><p>Class: ${student.class}</p>`;
+
+      const { data: marks, error: marksError } = await supabase.from('marks').select('*').eq('student_id', student.id);
+      if (marksError || !marks || marks.length === 0) {
+        document.getElementById('marks-table').innerHTML = 'No marks found.';
+        return;
+      }
+
+      let marksHTML = '<table><tr><th>Subject</th><th>Marks</th></tr>';
+      marks.forEach(m => {
+        marksHTML += `<tr><td>${m.subject}</td><td>${m.marks}</td></tr>`;
+      });
+      marksHTML += '</table>';
+      document.getElementById('marks-table').innerHTML = marksHTML;
+
+      switchTab('home');
+    }
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) loadPortal();
+    });
+  </script>
+</body>
+</html>
